@@ -1,6 +1,6 @@
 import csv, re, typing
 import os, numpy as np
-import collections
+import collections, random, itertools
 import nltk.corpus, nltk.stem
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
@@ -10,6 +10,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
 from sklearn import preprocessing
 from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 
 
 class Labels:
@@ -34,24 +35,24 @@ class Labels:
         return self.reverse_label_bindings[label_id]
 
         
-def produce_file_rows(file_name:str, label_obj:Labels) -> typing.Iterator:
+def produce_file_rows(file_name:str, label_obj:Labels, counter:itertools.count) -> typing.Iterator:
     with open(file_name) as f:
-        c_num = 0
-        for link, css_path, is_feature, text, feature_validation, customer_type, *_ in csv.reader(f):
-            if c_num:
+        for ind, [link, css_path, is_feature, text, feature_validation, customer_type, *_] in enumerate(csv.reader(f)):
+            if ind:
                 if len(text) < 200:
+                    c = next(counter)
                     if 'yes' in (l1:=feature_validation.lower()):
                         for feature in (re.findall('(?<=\()[^\)]+(?=\))', l1) or [l1]):
-                            yield [text.lower(), label_obj[feature]]
+                            yield [c, text.lower(), label_obj[feature]]
                     else:
-                        yield [text.lower(), label_obj['']]
+                        yield [c, text.lower(), label_obj['']]
 
-            c_num += 1
 
 def get_training_data(label_obj:Labels, folder='training_data') -> typing.Iterator:
+    _count = itertools.count(1)
     for i in os.listdir(t_path:=os.path.join(os.getcwd(), folder)):
         if i.endswith('.csv'):
-            yield from produce_file_rows(os.path.join(t_path, i), label_obj)
+            yield from produce_file_rows(os.path.join(t_path, i), label_obj, _count)
     
 
 def all_classifiers() -> list:
@@ -116,41 +117,35 @@ def method_3():
     y_pred = clf.predict(X_test)
     print(metrics.accuracy_score(y_test, y_pred))
 
+def _train_test_split(x, y, n):
+    arr = [*range(n)]
+    random.shuffle(arr)
+    test, train = arr[:int(n*0.25)], arr[int(n*0.25):]
+    return test, [x[i] for i in train], [x[i] for i in test], [y[i] for i in train], [y[i] for i in test]
+
 def method_4():
-    #accuracy: 0.6923076923076923
     label_obj, feat_type = Labels(), collections.defaultdict(list)
-    n = [*get_training_data(label_obj)]
-    for a, b in n:
-        feat_type[bool(label_obj.retrieve_label(b))].append([a, b])
+    feature_options = collections.defaultdict(list)
+    for ind, a, b in get_training_data(label_obj):
+        feat_type[bool(label_obj.retrieve_label(b))].append([ind, a, b])
+        feature_options[ind].append(b)
 
     x_sample = feat_type[1]+feat_type[0][:len(feat_type[1])*2]
     lemmatizer = nltk.stem.WordNetLemmatizer()
-    _X = [' '.join(lemmatizer.lemmatize(j) for j in re.findall('[a-zA-Z\-]+', a) if j not in nltk.corpus.stopwords.words('english')) for a, _ in x_sample]
+    _X = [' '.join(lemmatizer.lemmatize(j) for j in re.findall('[a-zA-Z\-]+', a) if j not in nltk.corpus.stopwords.words('english')) for _, a, _ in x_sample]
     cv = CountVectorizer()
     tf_transformer = TfidfTransformer()
     X = cv.fit_transform(_X).toarray()
     X = tf_transformer.fit_transform(X).toarray()
-    y = [b for _, b in x_sample]
-    X_train, X_test, y_train, y_test = train_test_split(X, y)
-    for clf in all_classifiers():
-        clf.fit(X_train, y_train)
-        y_pred = clf.predict(X_test)
-        print(clf, metrics.accuracy_score(y_test, y_pred))
+    y = [b for *_, b in x_sample]
+    test_inds, X_train, X_test, y_train, y_test = _train_test_split(X, y, len(x_sample))
+    rf = RandomForestClassifier()
+    rf.fit(X_train, y_train)
+    y_pred = rf.predict(X_test)
+    #print([*y_pred], [feature_options[x_sample[a][0]] for a in test_inds])
+    print(rf, metrics.accuracy_score(y_test, y_pred))
+    print(rf, sum(b in feature_options[x_sample[a][0]] for a, b in zip(test_inds, [*y_pred]))/len(test_inds))
     
-    '''
-    SVC(gamma='auto') 0.6520710059171597
-    GaussianNB() 0.4390532544378698
-    HistGradientBoostingClassifier() 0.6319526627218935
-    RandomForestClassifier() 0.7183431952662722
-    LogisticRegression() 0.6710059171597633
-    '''
-
-    '''
-    clf = SVC(gamma='auto')
-    clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
-    print(metrics.accuracy_score(y_test, y_pred))
-    '''
 
 if __name__ == '__main__':
     '''
@@ -161,6 +156,7 @@ if __name__ == '__main__':
     - perhaps ignore all training data that has score < 0.5, unless it has been specificially labeled?
     - is there a better classifier type to use for this problem i.e RandomForrest?
     - how should the input text best be preprocessed?
+    - how long should the training step take to run? ~5 seconds now
 
     TODO: 
     - Run full training set against a new site's text
