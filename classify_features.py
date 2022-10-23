@@ -123,7 +123,7 @@ def _train_test_split(x, y, n):
     test, train = arr[:int(n*0.25)], arr[int(n*0.25):]
     return test, [x[i] for i in train], [x[i] for i in test], [y[i] for i in train], [y[i] for i in test]
 
-def method_4():
+def vectorized_training_data():
     label_obj, feat_type = Labels(), collections.defaultdict(list)
     feature_options = collections.defaultdict(list)
     for ind, a, b in get_training_data(label_obj):
@@ -134,8 +134,11 @@ def method_4():
     lemmatizer = nltk.stem.WordNetLemmatizer()
     _X = [' '.join(lemmatizer.lemmatize(j) for j in re.findall('[a-zA-Z\-]+', a) if j not in nltk.corpus.stopwords.words('english')) for _, a, _ in x_sample]
     cv = CountVectorizer()
+    return cv.fit_transform(_X).toarray(), x_sample, feature_options
+
+def method_4():
+    X, x_sample, feature_options = vectorized_training_data()
     tf_transformer = TfidfTransformer()
-    X = cv.fit_transform(_X).toarray()
     X = tf_transformer.fit_transform(X).toarray()
     y = [b for *_, b in x_sample]
     test_inds, X_train, X_test, y_train, y_test = _train_test_split(X, y, len(x_sample))
@@ -143,7 +146,6 @@ def method_4():
     rf.fit(X_train, y_train)
     y_pred = rf.predict(X_test)
     #print([*y_pred], [feature_options[x_sample[a][0]] for a in test_inds])
-    print(rf, metrics.accuracy_score(y_test, y_pred))
     print(rf, sum(b in feature_options[x_sample[a][0]] for a, b in zip(test_inds, [*y_pred]))/len(test_inds))
     
 
