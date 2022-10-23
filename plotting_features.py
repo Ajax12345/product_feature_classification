@@ -26,7 +26,7 @@ def produce_plot():
     plt.style.use('ggplot')
 
     fig, ax = plt.subplots()
-    fig.set_size_inches(20,10)
+    fig.set_size_inches(15,8)
 
     cmap = {0: 'green', 1: 'blue'}
     for group in np.unique(clusters):
@@ -37,6 +37,7 @@ def produce_plot():
     ax.legend()
     plt.xlabel("PCA 0")
     plt.ylabel("PCA 1")
+    plt.figure(figsize=(3,3))
     plt.show()
 
 if __name__ == '__main__':
