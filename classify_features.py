@@ -134,10 +134,13 @@ def vectorized_training_data():
     lemmatizer = nltk.stem.WordNetLemmatizer()
     _X = [' '.join(lemmatizer.lemmatize(j) for j in re.findall('[a-zA-Z\-]+', a) if j not in nltk.corpus.stopwords.words('english')) for _, a, _ in x_sample]
     cv = CountVectorizer()
-    return cv.fit_transform(_X).toarray(), x_sample, feature_options
+    X = cv.fit_transform(_X).toarray()
+    tf_transformer = TfidfTransformer()
+    X = tf_transformer.fit_transform(X).toarray()
+    return X, cv, tf_transformer, x_sample, feature_options
 
 def method_4():
-    X, x_sample, feature_options = vectorized_training_data()
+    X, cv, tf_transformer, x_sample, feature_options = vectorized_training_data()
     tf_transformer = TfidfTransformer()
     X = tf_transformer.fit_transform(X).toarray()
     y = [b for *_, b in x_sample]
