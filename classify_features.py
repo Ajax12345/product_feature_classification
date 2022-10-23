@@ -160,7 +160,6 @@ if __name__ == '__main__':
 
     TODO: 
     - Run full training set against a new site's text
-    - Remember that a single feature description/bit of text can have multiple paraphrases, need to factor that into accuracy calculator
     '''
     method_4()
     
